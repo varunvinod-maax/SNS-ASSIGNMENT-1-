@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SecureBank Transfer — RSA Encryption and Attack Simulation</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#04070f;--panel:#0a1630;--line:#1d3a78;--glow:#3d8bff;--text:#eef3ff;--dim:#8fa3cc;--gold:#f2b84b;--red:#ff4d5e;--ok:#4be3a0;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#04070f}}
+:root[data-theme="dark"]{--bg:#04070f}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Sora,system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+body.atk{--glow:#ff4d5e;--line:#6b1a28;--panel:#1a0910}
+body{transition:background .8s}
+body.atk{background:#0a0206}
+main{max-width:760px;margin:0 auto;padding:14px 14px 90px}
+h1{font-size:15px;font-weight:600;color:var(--dim);margin:0 0 4px}
+h2{font-size:clamp(20px,5vw,28px);font-weight:800;margin:0 0 12px}
+#stage{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
+.p{position:relative;text-align:center;font-size:10px;line-height:1.2;color:var(--dim);opacity:.45;transition:.5s}
+.p.on{opacity:1;color:var(--text)}
+.av{width:44px;height:44px;margin:0 auto 5px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2b4f9c,#0a1630 70%);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;transition:.5s}
+.p.on .av{border-color:var(--glow);box-shadow:0 0 18px var(--glow)}
+.p.a .av{background:radial-gradient(circle at 35% 30%,#8a2a3a,#1a0910 70%)}
+.p.a.on .av{border-color:var(--red);box-shadow:0 0 18px var(--red)}
+#persp{perspective:900px}
+#screen{background:linear-gradient(160deg,var(--panel),#050a18);border:1px solid var(--glow);border-radius:14px;padding:18px 16px;min-height:300px;transform:rotateX(5deg);box-shadow:0 20px 60px -20px var(--glow),inset 0 0 40px rgba(61,139,255,.08);transition:border-color .8s,box-shadow .8s}
+#lines div{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:clamp(13px,3.6vw,16px);margin:7px 0;opacity:0;transform:translateY(6px);animation:in .5s forwards;overflow-wrap:anywhere}
+@keyframes in{to{opacity:1;transform:none}}
+.k{color:var(--glow);font-weight:600}.g{color:var(--gold);font-weight:600}.r{color:var(--red);font-weight:600}.o{color:var(--ok);font-weight:600}.d{color:var(--dim)}
+.big{font-size:clamp(20px,6vw,28px)!important;font-weight:600;text-shadow:0 0 18px currentColor}
+.card{display:inline-block;padding:6px 12px;border-radius:8px;border:1px solid}
+.pub{border-color:var(--glow);background:rgba(61,139,255,.14);color:#bcd6ff}
+.prv{border-color:var(--gold);background:rgba(242,184,75,.1);color:var(--gold)}
+.pk{position:absolute;z-index:5;padding:5px 9px;border-radius:7px;font:600 11px "IBM Plex Mono",monospace;background:#0b1d44;border:1px solid var(--glow);color:#fff;box-shadow:0 0 16px var(--glow);pointer-events:none;transition:left 1.4s ease-in-out,top 1.4s ease-in-out,opacity .4s;white-space:nowrap}
+.pk.gold{border-color:var(--gold);box-shadow:0 0 16px var(--gold);background:#2a1d05;color:var(--gold)}
+.pk.red{border-color:var(--red);box-shadow:0 0 16px var(--red);background:#2a0810;color:#ffd0d5}
+#tm{display:inline-block;margin-top:8px;font-size:12px;color:var(--dim)}
+nav{position:fixed;left:0;right:0;bottom:0;padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(4,7,15,.92);backdrop-filter:blur(8px);display:flex;gap:8px;align-items:center;justify-content:center;border-top:1px solid var(--line)}
+button{font:600 14px Sora,sans-serif;color:var(--text);background:var(--panel);border:1px solid var(--glow);border-radius:10px;padding:10px 16px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+#dots{flex:1;text-align:center;font-size:12px;color:var(--dim)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:520px){.two{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){#lines div{animation-duration:.01s}.pk{transition-duration:.01s}}
+</style></head><body>
+<main>
+<h1>SecureBank Transfer — RSA Encryption and Attack Simulation</h1>
+<h2 id="t"></h2>
+<div id="stage"></div>
+<div id="persp"><div id="screen"><div id="lines"></div></div></div>
+</main>
+<nav><button id="pv" aria-label="Previous scene">Back</button><span id="dots"></span><button id="pl">Pause</button><button id="nx">Next</button></nav>
+<script>
+const R=[["1","Key Generator"],["2","Sender A"],["3","Sender B"],["4","Courier (public channel)"],["5","Receiver A"],["6","Receiver B"],["7","Attacker A"],["8","Attacker B"],["9","Attacker C"],["10","Judge / Timekeeper"]];
+const SQ=["9¹ mod 55 = 9","9² mod 55 = 26","9⁴ mod 55 = 16","9⁸ mod 55 = 36","9¹⁶ mod 55 = 31"];
+const DEC=["M = C^d mod n","M = 9²⁷ mod 55",...SQ,"27 = 16 + 8 + 2 + 1","9²⁷ = 9¹⁶ × 9⁸ × 9² × 9¹ mod 55","= 31 × 36 × 26 × 9 mod 55","= 4"];
+const S=[
+{t:"1 · SecureBank must send a secret code",on:[],ln:[["SECUREBANK","k big"],["Transaction Authorization Code: 4",""],["→ travelling to the Clearing House",""],["It must cross a public channel.","d"],["RSA Public-Key Encryption","k"],["<span class='card pub'>PUBLIC KEY → can be shared</span>",""],["<span class='card prv'>🔒 PRIVATE KEY → must stay secret</span>",""]]},
+{t:"2 · The 10 roles",on:[0,1,2,3,4,5,6,7,8,9],ln:[["Student 1 — Key Generator",""],["Students 2, 3 — Sender A, Sender B",""],["Student 4 — Courier / Public Channel",""],["Students 5, 6 — Receiver A, Receiver B",""],["Students 7, 8, 9 — Attacker A, B, C",""],["Student 10 — Judge / Timekeeper",""],["LEGITIMATE: Key Generator → Sender → Courier → Receiver","o"],["ATTACK: Courier → Attacker A → B → C","r"]]},
+{t:"3 · Student 1 builds the keys",on:[0,1,2,4,5],pk:[[0,1,"PUBLIC (3,55)",""],[0,2,"PUBLIC (3,55)",""],[0,4,"🔒 PRIVATE (27,55)","gold"],[0,5,"🔒 PRIVATE (27,55)","gold"]],ln:[["p = 5   q = 11","k"],["n = p × q = 5 × 11 = 55",""],["φ(n) = (p − 1)(q − 1)",""],["φ(n) = (5 − 1)(11 − 1) = 4 × 10 = 40",""],["e = 3   gcd(3,40) = 1 ✓","k"],["(3 × d) mod 40 = 1  →  d = 27",""],["3 × 27 = 81,  81 mod 40 = 1 ✓","o"],["<span class='card pub'>PUBLIC KEY (e,n) = (3,55)</span>",""],["<span class='card prv'>🔒 PRIVATE KEY (d,n) = (27,55)</span>",""],["Private key goes ONLY to the Receivers.","g"]]},
+{t:"4 · Senders encrypt the message",on:[1,2],ln:[["Sender A and B hold: M = 4, e = 3, n = 55","d"],["C = M^e mod n","k"],["C = 4³ mod 55",""],["C = 64 mod 55",""],["C = 9","k big"],["SENDER A = 9","o"],["SENDER B = 9","o"],["✓ MATCH","o big"],["Card for the Courier holds only: C = 9","g"]]},
+{t:"5 · The Courier carries C over a public channel",on:[1,3,6,7,8],pk:[[1,3,"C = 9","" ],[3,6,"copy: C=9, (3,55)","red"]],ln:[["PUBLIC CHANNEL","k"],["Courier carries C = 9 to the Receivers.",""],["Ciphertext travels where anyone can see it.","d"],["Attackers copy:","r"],["C = 9    e = 3    n = 55","r"],["They do NOT know d.","r big"]]},
+{t:"6 · Receivers decrypt with the private key",on:[3,4,5,9],pk:[[3,4,"C = 9",""],[3,5,"C = 9",""],[4,9,"M = 4","" ],[5,9,"M = 4",""]],ln:[["C = 9    d = 27    n = 55","k"],...DEC.map((x,i)=>[x,i==DEC.length-1?"o":""]),["DECRYPTED MESSAGE = 4","o big"],["Receiver A = 4   Receiver B = 4  ✓ MATCH","o"],["Legitimate Receiver Time = 18 minutes","g"]]},
+{t:"7 · Attacker A factors the modulus",atk:1,on:[6,7],pk:[[6,7,"p=5, q=11","red"]],ln:[["ATTACKER A — FACTORING THE RSA MODULUS","r"],["Has: C = 9, (e,n) = (3,55).  No d.","d"],["55 ÷ 2 → NOT DIVISIBLE",""],["55 ÷ 3 → NOT DIVISIBLE",""],["55 ÷ 5 = 11 ✓","o"],["55 = 5 × 11","k big"],["p = 5   q = 11","k"],["Time: 30 seconds","g"]]},
+{t:"8 · Attacker B rebuilds the private key",atk:1,on:[7,8],pk:[[7,8,"d = 27","red"]],ln:[["ATTACKER B — RECONSTRUCTING THE PRIVATE KEY","r"],["Receives p = 5, q = 11","d"],["φ(n) = (5 − 1)(11 − 1) = 4 × 10 = 40",""],["Knows e = 3.  Solve (3 × d) mod 40 = 1",""],["Try d = 27: 3 × 27 = 81, 81 mod 40 = 1","o"],["PRIVATE EXPONENT RECOVERED","r big"],["d = 27","r big"],["Derived from public info: factor n, then φ(n).","d"],["Time: 6 minutes","g"]]},
+{t:"9 · Attacker C reads the message",atk:1,on:[8,9],pk:[[8,9,"M = 4","red"]],ln:[["ATTACKER C — DECRYPTING THE INTERCEPTED MESSAGE","r"],["Has: C = 9, d = 27, n = 55","d"],...DEC.map((x,i)=>[x,i==DEC.length-1?"o":""]),["MESSAGE RECOVERED","r big"],["M = 4","r big"],["Attack time: 12 minutes","g"],["Reports “Recovered message = 4” to the Judge.","d"]]},
+{t:"10 · Final comparison",on:[0,1,2,3,4,5,6,7,8,9],two:1}
+];
+const st=document.getElementById("stage"),L=document.getElementById("lines");
+R.forEach((r,i)=>{const d=document.createElement("div");d.className="p"+(i>5&&i<9?" a":"");d.innerHTML=`<div class="av">${r[0]}</div>${r[1]}`;st.appendChild(d)});
+let i=0,play=true,timers=[];
+const P=[...st.children];
+function clear(){timers.forEach(clearTimeout);timers=[];st.querySelectorAll(".pk").forEach(e=>e.remove())}
+function show(n){
+ i=Math.max(0,Math.min(S.length-1,n));clear();const s=S[i];
+ document.getElementById("t").textContent=s.t;document.body.classList.toggle("atk",!!s.atk);
+ document.getElementById("dots").textContent=(i+1)+" / "+S.length;
+ P.forEach((p,k)=>p.classList.toggle("on",s.on.includes(k)));
+ L.innerHTML="";let at=0;
+ if(s.two){L.innerHTML=`<div class="two"><div><div class="o" style="font-family:'IBM Plex Mono',monospace">LEGITIMATE PATH</div><div class="d">Key Generator ↓ Sender ↓ Courier ↓ Receiver ↓</div><div class="o big" style="font-family:'IBM Plex Mono',monospace;margin:8px 0">M = 4</div><div class="g">Time: 18 minutes</div></div><div><div class="r" style="font-family:'IBM Plex Mono',monospace">ATTACK PATH</div><div class="d">Public key + intercepted C ↓ Attacker A: factor n → p = 5, q = 11 ↓ Attacker B: φ(n) = 40 → d = 27 ↓ Attacker C: 9²⁷ mod 55</div><div class="r big" style="font-family:'IBM Plex Mono',monospace;margin:8px 0">M = 4</div><div class="g">Time: 30 s + 6 min + 12 min = 18 min 30 s</div></div></div><p class="d" style="margin-top:18px;font-size:13px;line-height:1.5">Both paths reach M = 4. The attackers never received d. They rebuilt it because n = 55 is tiny. Real RSA uses a modulus with hundreds of digits, which cannot be factored this way.</p>`;L.firstChild.style.opacity=1;L.firstChild.style.transform="none";L.firstChild.style.animation="none"}
+ else s.ln.forEach(([x,c],k)=>{const d=document.createElement("div");d.className=c;d.innerHTML=x;d.style.animationDelay=(k*0.75)+"s";L.appendChild(d);at=k*0.75});
+ (s.pk||[]).forEach((q,k)=>timers.push(setTimeout(()=>fly(q),600+k*1700)));
+ if(play)timers.push(setTimeout(()=>show(i+1),(s.two?9999999:Math.max(9000,(at+5)*1000+((s.pk||[]).length*300)))));
+}
+function fly([a,b,txt,cls]){
+ const sr=st.getBoundingClientRect(),ra=P[a].getBoundingClientRect(),rb=P[b].getBoundingClientRect();
+ const e=document.createElement("div");e.className="pk "+cls;e.textContent=txt;
+ e.style.left=(ra.left-sr.left+ra.width/2-30)+"px";e.style.top=(ra.top-sr.top+10)+"px";st.appendChild(e);
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{e.style.left=(rb.left-sr.left+rb.width/2-30)+"px";e.style.top=(rb.top-sr.top+10)+"px"}));
+ timers.push(setTimeout(()=>e.style.opacity=0,2400));
+}
+document.getElementById("nx").onclick=()=>show(i+1);
+document.getElementById("pv").onclick=()=>show(i-1);
+document.getElementById("pl").onclick=e=>{play=!play;e.target.textContent=play?"Pause":"Play";show(i)};
+show(0);
+</script></body></html>
